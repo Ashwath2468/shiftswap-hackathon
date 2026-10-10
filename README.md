@@ -37,15 +37,15 @@ The application validates shift eligibility before allowing a claim and records 
 ## Database Setup
 
 1. Start MySQL.
-2. Create the database:
+2. Create the database configured in `src/main/resources/application.properties`:
 
    ```sql
-   CREATE DATABASE shiftswap_db;
+   CREATE DATABASE shiftswap_seed_test;
    ```
 
-3. Open `src/main/resources/application.properties`.
-4. Configure the MySQL URL, username, and password to match your local setup.
-5. If the password property uses `${DB_PASSWORD}`, configure that environment variable before starting the application.
+3. Configure the MySQL URL, username, and password in `src/main/resources/application.properties` to match your local setup.
+4. If the password property uses `${DB_PASSWORD}`, configure the `DB_PASSWORD` environment variable before starting the application.
+5. Run the application. On an empty database, the application loads the organizer-provided staff and shift data from `seed.json`.
 
 Do not commit real database passwords or other credentials to GitHub.
 

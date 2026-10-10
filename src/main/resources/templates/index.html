@@ -1,0 +1,666 @@
+
+
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ShiftSwap | Clinic Roster</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1e293b;
+        }
+
+        header {
+            background: #163b65;
+            color: white;
+            padding: 24px 5%;
+        }
+
+        header h1 {
+            margin: 0 0 6px;
+        }
+
+        header p {
+            margin: 0;
+            color: #dbeafe;
+        }
+
+        main {
+            max-width: 1250px;
+            margin: 28px auto;
+            padding: 0 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 22px;
+            margin-bottom: 22px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px #0000000b;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #163b65;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            background: #eff6ff;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-size: 14px;
+        }
+
+        button {
+            background: #1769aa;
+            color: white;
+            cursor: pointer;
+            border: none;
+            margin: 3px 0;
+        }
+
+        button:hover {
+            background: #124d80;
+        }
+
+        button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .danger {
+            background: #b42318;
+        }
+
+        .danger:hover {
+            background: #912018;
+        }
+
+        .success {
+            background: #067647;
+        }
+
+        .success:hover {
+            background: #05603a;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+        }
+
+        .success-message {
+            background: #dcfae6;
+            color: #05603a;
+        }
+
+        .error-message {
+            background: #fee4e2;
+            color: #912018;
+            overflow-wrap: anywhere;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 20px;
+            background: #e2e8f0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .OPEN {
+            background: #dcfae6;
+            color: #05603a;
+        }
+
+        .CLAIMED {
+            background: #fef0c7;
+            color: #93370d;
+        }
+
+        .APPROVED {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .WITHDRAWN {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .actions {
+            min-width: 155px;
+        }
+
+        .eligibility {
+            min-width: 190px;
+            margin-top: 4px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            overflow-wrap: anywhere;
+        }
+
+        .eligibility-ok {
+            background: #dcfae6;
+            color: #05603a;
+        }
+
+        .eligibility-error {
+            background: #fee4e2;
+            color: #912018;
+        }
+
+        .eligibility ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .eligibility li {
+            margin-bottom: 5px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        footer {
+            padding: 15px 0 25px;
+        }
+
+        @media (max-width: 750px) {
+            table {
+                min-width: 900px;
+            }
+
+            .panel {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>ShiftSwap</h1>
+    <p>Clinic staff shift exchange and manager approval</p>
+</header>
+
+<main>
+
+    <!-- Success and error messages -->
+    <div th:if="${successMessage}"
+         class="message success-message"
+         th:text="${successMessage}">
+    </div>
+
+    <div th:if="${errorMessage}"
+         class="message error-message"
+         th:text="${errorMessage}">
+    </div>
+
+    <!-- Acting user -->
+    <section class="panel">
+        <h2>Acting User</h2>
+
+        <p class="muted">
+            Demo mode: select a staff member or manager to perform actions.
+        </p>
+
+        <form method="get" action="/">
+            <label for="actorId">Select user:</label>
+
+            <select name="actorId"
+                    id="actorId"
+                    onchange="this.form.submit()">
+
+                <option th:each="person : ${staffMembers}"
+                        th:value="${person.id}"
+                        th:text="${person.name + ' (' + person.role + ')'}"
+                        th:selected="${person.id == selectedActorId}">
+                </option>
+
+            </select>
+
+            <noscript>
+                <button type="submit">Switch user</button>
+            </noscript>
+        </form>
+
+        <p th:if="${selectedActor != null}">
+            Acting as:
+            <strong th:text="${selectedActor.name}"></strong>
+
+            <span class="status"
+                  th:text="${selectedActor.role}">
+            </span>
+        </p>
+
+        <p class="muted" th:if="${selectedActor != null
+                                 and selectedActor.role == 'STAFF'}">
+            Certifications:
+            <span th:if="${selectedActor.certifications == null
+                          or #lists.isEmpty(selectedActor.certifications)}">
+                None
+            </span>
+            <span th:unless="${selectedActor.certifications == null
+                              or #lists.isEmpty(selectedActor.certifications)}"
+                  th:text="${#strings.listJoin(
+                      selectedActor.certifications, ', ')}">
+            </span>
+        </p>
+    </section>
+
+    <!-- Clinic shifts -->
+    <section class="panel">
+        <h2>Clinic Shifts</h2>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Shift ID</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Required Certification</th>
+                    <th>Assigned Staff</th>
+                    <th>Action</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <tr th:each="shift : ${shifts}">
+
+                    <td th:text="${shift.id}"></td>
+
+                    <td th:text="${#temporals.format(
+                        shift.startTime, 'dd MMM yyyy HH:mm')}">
+                    </td>
+
+                    <td th:text="${#temporals.format(
+                        shift.endTime, 'dd MMM yyyy HH:mm')}">
+                    </td>
+
+                    <td th:text="${shift.requiredCertification != null
+                        and !#strings.isEmpty(shift.requiredCertification)
+                        ? shift.requiredCertification : 'None'}">
+                    </td>
+
+                    <td>
+                        <span th:each="person : ${staffMembers}"
+                              th:if="${person.id == shift.assignedTo}"
+                              th:text="${person.name}">
+                        </span>
+                    </td>
+
+                    <td class="actions">
+
+                        <form th:if="${selectedActor != null
+                                      and selectedActor.role == 'STAFF'
+                                      and selectedActorId == shift.assignedTo}"
+                              method="post"
+                              action="/post">
+
+                            <input type="hidden"
+                                   name="shiftId"
+                                   th:value="${shift.id}">
+
+                            <input type="hidden"
+                                   name="actorId"
+                                   th:value="${selectedActorId}">
+
+                            <button type="submit">Post Shift</button>
+                        </form>
+
+                        <span class="muted"
+                              th:if="${selectedActor == null
+                                      or selectedActor.role != 'STAFF'
+                                      or selectedActorId != shift.assignedTo}">
+                            No action available
+                        </span>
+
+                    </td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(shifts)}">
+                    <td colspan="6">No clinic shifts available.</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Shift listings -->
+    <section class="panel">
+        <h2>Shift Listings</h2>
+
+        <p class="muted">
+            Claim eligibility is calculated for the currently selected staff member.
+            Pending claims do not change shift assignments until manager approval.
+        </p>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Listing</th>
+                    <th>Shift</th>
+                    <th>Posted By</th>
+                    <th>Claimed By</th>
+                    <th>Status</th>
+                    <th>Claim Eligibility</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <tr th:each="listing : ${listings}">
+
+                    <td th:text="${listing.id}"></td>
+
+                    <td>
+                        <span th:each="shift : ${shifts}"
+                              th:if="${shift.id == listing.shiftId}"
+                              th:text="${shift.id + ' | ' +
+                                  #temporals.format(
+                                      shift.startTime, 'dd MMM HH:mm')}">
+                        </span>
+                    </td>
+
+                    <td>
+                        <span th:each="person : ${staffMembers}"
+                              th:if="${person.id == listing.posterId}"
+                              th:text="${person.name}">
+                        </span>
+                    </td>
+
+                    <td>
+                        <span th:each="person : ${staffMembers}"
+                              th:if="${listing.claimerId != null
+                                      and person.id == listing.claimerId}"
+                              th:text="${person.name}">
+                        </span>
+
+                        <span th:if="${listing.claimerId == null}">—</span>
+                    </td>
+
+                    <td>
+                        <span class="status"
+                              th:classappend="${listing.status}"
+                              th:text="${listing.status}">
+                        </span>
+                    </td>
+
+                    <!-- Claim eligibility -->
+                    <td>
+
+                        <div th:if="${listing.status == 'OPEN'
+                                    and selectedActor != null
+                                    and selectedActor.role == 'STAFF'
+                                    and selectedActorId != listing.posterId}"
+                             class="eligibility"
+                             th:classappend="${claimErrors[listing.id] != null
+                                 and #lists.isEmpty(claimErrors[listing.id])
+                                 ? ' eligibility-ok'
+                                 : ' eligibility-error'}">
+
+                            <strong
+                                th:if="${claimErrors[listing.id] != null
+                                        and #lists.isEmpty(claimErrors[listing.id])}">
+                                Claimable
+                            </strong>
+
+                            <strong
+                                th:unless="${claimErrors[listing.id] != null
+                                            and #lists.isEmpty(claimErrors[listing.id])}">
+                                Not claimable
+                            </strong>
+
+                            <ul th:if="${claimErrors[listing.id] != null
+                                        and !#lists.isEmpty(claimErrors[listing.id])}">
+
+                                <li th:each="reason : ${claimErrors[listing.id]}"
+                                    th:text="${reason}">
+                                </li>
+
+                            </ul>
+
+                            <p class="muted"
+                               th:if="${claimErrors[listing.id] == null}">
+                                Eligibility could not be calculated.
+                            </p>
+                        </div>
+
+                        <span class="muted"
+                              th:if="${listing.status == 'OPEN'
+                                      and selectedActor != null
+                                      and selectedActorId == listing.posterId}">
+                            Your listing
+                        </span>
+
+                        <span class="muted"
+                              th:if="${listing.status == 'OPEN'
+                                      and selectedActor != null
+                                      and selectedActor.role == 'MANAGER'}">
+                            Managers cannot claim
+                        </span>
+
+                        <span class="muted"
+                              th:if="${listing.status != 'OPEN'}">
+                            Not applicable
+                        </span>
+
+                    </td>
+
+                    <!-- Available actions -->
+                    <td class="actions">
+
+                        <!-- Other staff can claim an OPEN listing. -->
+                        <form th:if="${selectedActor != null
+                                      and selectedActor.role == 'STAFF'
+                                      and listing.status == 'OPEN'
+                                      and selectedActorId != listing.posterId}"
+                              method="post"
+                              action="/claim">
+
+                            <input type="hidden"
+                                   name="listingId"
+                                   th:value="${listing.id}">
+
+                            <input type="hidden"
+                                   name="actorId"
+                                   th:value="${selectedActorId}">
+
+                            <button type="submit"
+                                    th:disabled="${claimErrors[listing.id] == null
+                                        or !#lists.isEmpty(claimErrors[listing.id])}">
+                                Claim
+                            </button>
+                        </form>
+
+                        <!-- The poster can withdraw their OPEN listing. -->
+                        <form th:if="${selectedActor != null
+                                      and selectedActor.role == 'STAFF'
+                                      and listing.status == 'OPEN'
+                                      and selectedActorId == listing.posterId}"
+                              method="post"
+                              action="/withdraw">
+
+                            <input type="hidden"
+                                   name="listingId"
+                                   th:value="${listing.id}">
+
+                            <input type="hidden"
+                                   name="actorId"
+                                   th:value="${selectedActorId}">
+
+                            <button class="danger" type="submit">
+                                Withdraw
+                            </button>
+                        </form>
+
+                        <!-- The claimant can cancel a pending claim. -->
+                        <form th:if="${selectedActor != null
+                                      and selectedActor.role == 'STAFF'
+                                      and listing.status == 'CLAIMED'
+                                      and selectedActorId == listing.claimerId}"
+                              method="post"
+                              action="/unclaim">
+
+                            <input type="hidden"
+                                   name="listingId"
+                                   th:value="${listing.id}">
+
+                            <input type="hidden"
+                                   name="actorId"
+                                   th:value="${selectedActorId}">
+
+                            <button type="submit">Unclaim</button>
+                        </form>
+
+                        <!-- Managers can approve or reject CLAIMED listings. -->
+                        <div th:if="${selectedActor != null
+                                     and selectedActor.role == 'MANAGER'
+                                     and listing.status == 'CLAIMED'}">
+
+                            <form method="post" action="/approve">
+
+                                <input type="hidden"
+                                       name="listingId"
+                                       th:value="${listing.id}">
+
+                                <input type="hidden"
+                                       name="actorId"
+                                       th:value="${selectedActorId}">
+
+                                <button class="success" type="submit">
+                                    Approve
+                                </button>
+                            </form>
+
+                            <form method="post" action="/reject">
+
+                                <input type="hidden"
+                                       name="listingId"
+                                       th:value="${listing.id}">
+
+                                <input type="hidden"
+                                       name="actorId"
+                                       th:value="${selectedActorId}">
+
+                                <button class="danger" type="submit">
+                                    Reject
+                                </button>
+                            </form>
+                        </div>
+
+                        <span class="muted"
+                              th:if="${listing.status == 'APPROVED'
+                                      or listing.status == 'WITHDRAWN'}">
+                            No actions available
+                        </span>
+
+                    </td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(listings)}">
+                    <td colspan="7">No shift listings yet.</td>
+                </tr>
+
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Action history -->
+    <section class="panel">
+        <h2>Action History</h2>
+
+        <p class="muted">
+            Recorded actions remain available after application restarts
+            when stored in the configured database.
+        </p>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Shift</th>
+                    <th>Outcome</th>
+                    <th>Details</th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <tr th:each="event : ${actionHistory}">
+
+                    <td th:text="${event.timestamp != null
+                        ? #temporals.format(
+                            event.timestamp, 'dd MMM yyyy HH:mm:ss')
+                        : '—'}">
+                    </td>
+
+                    <td th:text="${event.actorId}"></td>
+                    <td th:text="${event.action}"></td>
+                    <td th:text="${event.shiftId}"></td>
+                    <td th:text="${event.outcome}"></td>
+                    <td th:text="${event.details}"></td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(actionHistory)}">
+                    <td colspan="6">No actions recorded yet.</td>
+                </tr>
+
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer class="muted">
+        ShiftSwap demo · Data stored in the configured database
+    </footer>
+
+</main>
+
+</body>
+</html>

@@ -1,17 +1,25 @@
 
 package com.project.HackthonStarter;
 
-import com.project.HackthonStarter.model.Staff;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.project.HackthonStarter.model.Shift;
-import com.project.HackthonStarter.repository.StaffRepository;
+import com.project.HackthonStarter.model.Staff;
+import com.project.HackthonStarter.repository.ActionHistoryRepository;
+import com.project.HackthonStarter.repository.ListingRepository;
 import com.project.HackthonStarter.repository.ShiftRepository;
+import com.project.HackthonStarter.repository.StaffRepository;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 public class DataInitializer {
@@ -19,91 +27,107 @@ public class DataInitializer {
     @Bean
     CommandLineRunner initializeData(
             StaffRepository staffRepository,
-            ShiftRepository shiftRepository) {
+            ShiftRepository shiftRepository,
+            ListingRepository listingRepository,
+            ActionHistoryRepository historyRepository,
+            JsonMapper jsonMapper) {
 
         return args -> {
 
-            // Never overwrite existing application data.
+            // Preserve all existing application data.
             if (staffRepository.count() > 0
-                    || shiftRepository.count() > 0) {
+                    || shiftRepository.count() > 0
+                    || listingRepository.count() > 0
+                    || historyRepository.count() > 0) {
+
                 System.out.println(
-                        "Existing data found. Demo seeding skipped.");
+                        "Existing data found. seed.json loading skipped.");
                 return;
             }
 
-            Staff staff1 = new Staff();
-            staff1.setId("S1");
-            staff1.setName("Ananya");
-            staff1.setRole("STAFF");
-            staff1.setCertifications(
-                    List.of("BASIC", "EMERGENCY"));
+            List<Staff> staffList = new ArrayList<>();
+            List<Shift> shiftList = new ArrayList<>();
 
-            Staff staff2 = new Staff();
-            staff2.setId("S2");
-            staff2.setName("Rahul");
-            staff2.setRole("STAFF");
-            staff2.setCertifications(
-                    List.of("BASIC"));
+            try (InputStream input =
+                    new ClassPathResource("seed.json").getInputStream()) {
 
-            Staff staff3 = new Staff();
-            staff3.setId("S3");
-            staff3.setName("Priya");
-            staff3.setRole("STAFF");
-            staff3.setCertifications(
-                    List.of("BASIC", "EMERGENCY"));
+                JsonNode root = jsonMapper.readTree(input);
 
-            Staff manager = new Staff();
-            manager.setId("M1");
-            manager.setName("Clinic Manager");
-            manager.setRole("MANAGER");
-            manager.setCertifications(List.of());
+                if (root == null
+                        || !root.has("staff")
+                        || !root.has("shifts")
+                        || !root.get("staff").isArray()
+                        || !root.get("shifts").isArray()) {
 
-            staffRepository.saveAll(
-                    List.of(staff1, staff2, staff3, manager));
+                    throw new IllegalArgumentException(
+                            "seed.json must contain staff and shifts arrays.");
+                }
 
-            // Sample shifts for the week beginning Monday,
-            // 12 October 2026. Times are local clinic times.
+                // Load staff members.
+                for (JsonNode node : root.path("staff")) {
 
-            Shift shift1 = new Shift();
-            shift1.setId("SH1");
-            shift1.setStartTime(
-                    LocalDateTime.of(2026, 10, 12, 9, 0));
-            shift1.setEndTime(
-                    LocalDateTime.of(2026, 10, 12, 17, 0));
-            shift1.setRequiredCertification("BASIC");
-            shift1.setAssignedTo("S1");
+                    Staff staff = new Staff();
 
-            Shift shift2 = new Shift();
-            shift2.setId("SH2");
-            shift2.setStartTime(
-                    LocalDateTime.of(2026, 10, 13, 9, 0));
-            shift2.setEndTime(
-                    LocalDateTime.of(2026, 10, 13, 17, 0));
-            shift2.setRequiredCertification("BASIC");
-            shift2.setAssignedTo("S2");
+                    staff.setId(node.path("id").asText());
+                    staff.setName(node.path("name").asText());
+                    staff.setRole(node.path("role").asText());
 
-            Shift shift3 = new Shift();
-            shift3.setId("SH3");
-            shift3.setStartTime(
-                    LocalDateTime.of(2026, 10, 14, 9, 0));
-            shift3.setEndTime(
-                    LocalDateTime.of(2026, 10, 14, 13, 0));
-            shift3.setRequiredCertification("EMERGENCY");
-            shift3.setAssignedTo("S1");
+                    List<String> certifications = new ArrayList<>();
 
-            Shift shift4 = new Shift();
-            shift4.setId("SH4");
-            shift4.setStartTime(
-                    LocalDateTime.of(2026, 10, 15, 9, 0));
-            shift4.setEndTime(
-                    LocalDateTime.of(2026, 10, 15, 17, 0));
-            shift4.setRequiredCertification(null);
-            shift4.setAssignedTo("S3");
+                    for (JsonNode cert : node.path("certifications")) {
+                        certifications.add(cert.asText());
+                    }
 
-            shiftRepository.saveAll(
-                    List.of(shift1, shift2, shift3, shift4));
+                    staff.setCertifications(certifications);
+                    staffList.add(staff);
+                }
 
-            System.out.println("Demo staff and shifts created.");
+                // Load shifts using the original JSON field names.
+                for (JsonNode node : root.path("shifts")) {
+
+                    Shift shift = new Shift();
+
+                    shift.setId(node.path("id").asText());
+
+                    shift.setStartTime(
+                            LocalDateTime.parse(
+                                    node.path("start").asText()));
+
+                    shift.setEndTime(
+                            LocalDateTime.parse(
+                                    node.path("end").asText()));
+
+                    JsonNode requiredCert =
+                            node.path("required_certification");
+
+                    shift.setRequiredCertification(
+                            requiredCert.isNull()
+                                    ? null
+                                    : requiredCert.asText());
+
+                    shift.setAssignedTo(
+                            node.path("assigned_to").asText());
+
+                    shiftList.add(shift);
+                }
+
+                // Save parsed data only after the file has been read.
+                staffRepository.saveAll(staffList);
+                shiftRepository.saveAll(shiftList);
+
+                System.out.println(
+                        "Successfully loaded " + staffList.size()
+                                + " staff members and "
+                                + shiftList.size()
+                                + " shifts from seed.json.");
+
+            } catch (Exception e) {
+
+                throw new IllegalStateException(
+                        "Failed to load seed.json. Check the file "
+                                + "location, JSON structure, and field values.",
+                        e);
+            }
         };
     }
 }
